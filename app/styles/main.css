@@ -1,0 +1,17 @@
+@import 'https://unpkg.com/svbstrate';
+
+.slider {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+.slide {
+  position: absolute;
+  top: 0; left: 0;
+  border: 2px solid black;
+  background: tomato;
+  width: 100%;
+}
+.slide-content {
+  padding-top: 50%;
+}

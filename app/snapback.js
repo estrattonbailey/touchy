@@ -11,11 +11,16 @@ function raf (cb) {
 
 export default function snapback (slider) {
   let width
+  let prevIndex = 0
   let index = 0
   let slidesCount = 0
   const track = document.createElement('div')
   let position = 0
   let delta = 0
+  let t = Date.now()
+  let velo = 0
+  let ticking = false
+  let tick = null
 
   track.style.cssText = `
     position: absolute;
@@ -24,9 +29,9 @@ export default function snapback (slider) {
 
   function clamp (i) {
     if (i > (slidesCount - 1)) {
-      return 0
+      return (slidesCount - 1)
     } else if (i < 0) {
-      return slidesCount - 1
+      return 0
     }
 
     return i
@@ -55,59 +60,129 @@ export default function snapback (slider) {
 
     delta = 0
     position = index * width * -1
-    track.style.transform = `translateX(-${position}px)`
+    track.style.transform = `translateX(${position}px)`
     slider.style.height = track.children[index].clientHeight + 'px'
   }
 
-  function select (i) {
-    const start = position + delta
-    const end = i * width * -1
+  function selectByVelocity () {
+    let v = Math.abs(velo)
+    const end = index * width * -1
+    let curr = position
+    let diff = Math.abs(end) - Math.abs(curr)
+    let d = diff
 
-    new Tweezer({
-      start,
+    let firstSlide = delta > 0 && index === 0 && prevIndex === 0
+
+    ticking = true
+
+    tick = setInterval(() => {
+      if (v > 0.2) {
+        v *= 1 - 0.1
+        const c = (diff * (1 - (d / diff)))
+        position = Math.round(firstSlide ? curr + c : curr - c)
+        track.style.transform = `translateX(${position}px)`
+        d *= 1 - 0.1
+      } else {
+        position = end
+        track.style.transform = `translateX(${end}px)`
+        clearInterval(tick)
+        ticking = false
+      }
+    }, (1000 / 60))
+  }
+
+  function selectByIndex () {
+    ticking = true
+
+    const end = index * width * -1
+
+    tick = new Tweezer({
+      start: position,
       end,
-      duration: 500
-    }).on('tick', val => {
-      track.style.transform = `translateX(${val}px)`
+      easing: (t, b, c, d) => {
+        return (t === d) ? b + c : c * (-Math.pow(2, -10 * t / d) + 1) + b
+      }
+    }).on('tick', v => {
+      track.style.transform = `translateX(${v}px)`
+      position = v
     }).on('done', () => {
-      index = i
+      track.style.transform = `translateX(${end}px)`
       position = end
-      delta = 0
+      ticking = false
+      tick = null
     }).begin()
   }
 
   function whichByDistance (delta) {
-    if (delta > (width / 2)) {
-      select(clamp(--index))
-    } else if (delta < ((width / 2) * -1)) {
-      select(clamp(++index))
+    if (delta > (width / 4)) {
+      return clamp(index - 1)
+    } else if (delta < ((width / 4) * -1)) {
+      return clamp(index + 1)
     } else {
-      select(index)
+      return index
     }
   }
 
   mount()
   resize()
-  select(index)
 
   window.addEventListener('resize', raf(resize))
 
   const drag = rosin(slider)
 
-  drag.on('drag', ({ x, y }) => {
+  drag.on('mousedown', (pos, e) => {
+    if (ticking && tick) {
+      tick.stop ? tick.stop() : clearInterval(tick)
+      ticking = false
+      velo = 0
+      delta = 0
+    }
+  })
+
+  drag.on('drag', ({ x, y }, e) => {
+    velo = ((x - delta) / (e.timeStamp - t)) * (1000 / 60)
+    t = e.timeStamp
     delta = x
     track.style.transform = `translateX(${position + delta}px)`
   })
+
   drag.on('mouseup', () => {
-    whichByDistance(delta)
+    t = null
+
+    let dir = delta < 0 ? -1 : 1
+    let v = Math.abs(velo)
+
+    position = position + delta
+
+    if (v > 20) {
+      // get anticipated resting position
+      let x = 0
+      while (v > 0.7) {
+        v *= 1 - 0.2
+        x += v
+      }
+      prevIndex = index
+      index = whichByDistance(x * dir)
+      selectByVelocity()
+      velo = 0
+    } else {
+      prevIndex = index
+      index = whichByDistance(delta)
+      velo = 0
+      selectByIndex()
+    }
   })
 
   return {
     prev () {
-      select(clamp(--index))
+      prevIndex = index
+      index = clamp(index - 1)
+      selectByIndex()
     },
     next () {
-      select(clamp(++index))
+      prevIndex = index
+      index = clamp(index + 1)
+      selectByIndex()
     }
   }
 }

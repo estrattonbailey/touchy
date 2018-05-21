@@ -37,7 +37,7 @@
     "webpack-dev-server": "^2.4.5"
   },
   "dependencies": {
-    "rosin": "^0.1.1",
+    "rosin": "^0.3.0",
     "tweezer.js": "^1.4.0"
   }
 }

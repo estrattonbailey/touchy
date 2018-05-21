@@ -1,4 +1,4 @@
-import snapback from './snapback.js'
+import snapback from 'snapback'
 
 /**
  * Enable hot reloading for all subsequent modules
@@ -18,4 +18,11 @@ document.getElementById('prev').addEventListener('click', e => {
 })
 document.getElementById('next').addEventListener('click', e => {
   slider.next()
+})
+
+slider.on('select', index => {
+  console.log('select', index)
+})
+slider.on('settle', index => {
+  console.log('settle', index)
 })
